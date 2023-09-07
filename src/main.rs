@@ -6,7 +6,9 @@ use axum::{
   response::IntoResponse,
   http::StatusCode, extract::{State, Path}, Json,
 };
-use serde::Serialize;
+
+use tokio::sync::RwLock;
+use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use time::{Date, macros::date};
 
@@ -24,7 +26,18 @@ pub struct Person {
   pub stack: Option<Vec<String>>,
 }
 
-type AppState = Arc<HashMap<Uuid, Person>>;
+#[derive(Deserialize, Clone)]
+pub struct RequestPerson {
+  #[serde(rename = "nome")]
+  pub name: String,
+  #[serde(rename = "apelido")]
+  pub nick: String,
+  #[serde(rename = "nascimento", with = "date_format")]
+  pub birth_date: Date,
+  pub stack: Option<Vec<String>>,
+}
+
+type AppState = Arc<RwLock<HashMap<Uuid, Person>>>;
 
 #[tokio::main]
 async fn main() {
@@ -43,7 +56,7 @@ async fn main() {
 
   people.insert(person.id, person);
 
-  let app_state: AppState = Arc::new(people);
+  let app_state: AppState = Arc::new(RwLock::new(people));
 
   // build our application with a single route
   let app = Router::new()
@@ -69,14 +82,28 @@ async fn find_person(
   State(people): State<AppState>,
   Path(person_id): Path<Uuid>,
 ) -> impl IntoResponse {
-  match people.get(&person_id) {
+  match people.read().await.get(&person_id) {
     Some(person) => Ok(Json(person.clone())),
     None => Err(StatusCode::NOT_FOUND),
   }
 }
 
-async fn create_person() -> impl IntoResponse {
-  (StatusCode::NOT_FOUND, "Criacao de uma pessoa")
+async fn create_person(
+  State(people): State<AppState>,
+  Json(request_person): Json<RequestPerson>
+) -> impl IntoResponse {
+  let id = Uuid::now_v7();
+  let new_person: Person = Person {
+    id,
+    name: request_person.name,
+    nick: request_person.nick,
+    birth_date: request_person.birth_date,
+    stack: request_person.stack
+  };
+
+  people.write().await.insert(new_person.id, new_person.clone());
+
+  (StatusCode::OK, Json(new_person))
 }
 
 async fn count_people() -> impl IntoResponse {
