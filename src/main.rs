@@ -27,14 +27,65 @@ pub struct Person {
 }
 
 #[derive(Deserialize, Clone)]
-pub struct RequestPerson {
+pub struct NewPersonName(String);
+
+impl TryFrom<String> for NewPersonName {
+  type Error = &'static str;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    if value.len() > 100 {
+      Ok(NewPersonName(value))
+    } else {
+      Err("name is greater than permitted")
+    }
+  }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct NewPersonNick(String);
+
+impl TryFrom<String> for NewPersonNick {
+  type Error = &'static str;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    if value.len() > 32 {
+      Ok(NewPersonNick(value))
+    } else {
+      Err("nick is greater than permitted")
+    }
+  }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct Tech(String);
+
+impl TryFrom<String> for Tech {
+  type Error = &'static str;
+
+  fn try_from(value: String) -> Result<Self, Self::Error> {
+    if value.len() > 32 {
+      Ok(Tech(value))
+    } else {
+      Err("tech is greater than permitted")
+    }
+  }
+}
+
+impl From<Tech> for String {
+  fn from(value: Tech) -> Self {
+      value.0
+  }
+}
+
+#[derive(Deserialize, Clone)]
+pub struct NewPerson {
   #[serde(rename = "nome")]
-  pub name: String,
+  pub name: NewPersonName,
   #[serde(rename = "apelido")]
-  pub nick: String,
+  pub nick: NewPersonNick,
   #[serde(rename = "nascimento", with = "date_format")]
   pub birth_date: Date,
-  pub stack: Option<Vec<String>>,
+  pub stack: Option<Vec<Tech>>,
 }
 
 type AppState = Arc<RwLock<HashMap<Uuid, Person>>>;
@@ -90,15 +141,16 @@ async fn find_person(
 
 async fn create_person(
   State(people): State<AppState>,
-  Json(request_person): Json<RequestPerson>
+  Json(new_person): Json<NewPerson>
 ) -> impl IntoResponse {
   let id = Uuid::now_v7();
+
   let new_person: Person = Person {
     id,
-    name: request_person.name,
-    nick: request_person.nick,
-    birth_date: request_person.birth_date,
-    stack: request_person.stack
+    name: new_person.name.0,
+    nick: new_person.nick.0,
+    birth_date: new_person.birth_date,
+    stack: new_person.stack.map(|stack: Vec<Tech>| stack.into_iter().map(String::from).collect())
   };
 
   people.write().await.insert(new_person.id, new_person.clone());
