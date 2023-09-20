@@ -5,5 +5,5 @@ I'm using the brazillian internet event "Rinha de Backend" (Backend Rooster) gre
 
 ## Study references
 
-https://github.com/reu/rinha-backend-rust
-https://github.com/viniciusfonseca/rinha-backend-rust/
+- https://github.com/reu/rinha-backend-rust
+- https://github.com/viniciusfonseca/rinha-backend-rust/
